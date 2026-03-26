@@ -1,0 +1,7 @@
+# Ignore JSON data files
+data/*.json
+*.json
+
+# Keep important config files
+!package.json
+!tsconfig.json
