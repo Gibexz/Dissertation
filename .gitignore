@@ -5,3 +5,12 @@ data/*.json
 # Keep important config files
 !package.json
 !tsconfig.json
+
+.venv/
+__pycache__/
+*.pyc
+.env
+
+Implimentation/Datasets/
+*.json
+*Zone.Identifier
