@@ -346,7 +346,10 @@ st.markdown("""
 # -----------------------------------
 # Global settings
 # -----------------------------------
-DEFAULT_DATA_PATH = "./dataset/ycrit_weekly_w_mon_copy.csv"
+import os
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DEFAULT_DATA_PATH = os.path.join(BASE_DIR, "dataset", "ycrit_weekly_w_mon_copy.csv")
+
 AVAILABLE_HORIZONS = [1, 4, 12, 26, 52]
 
 # Friendly display labels shown to user in sidebar and all outputs
