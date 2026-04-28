@@ -346,7 +346,7 @@ st.markdown("""
 # -----------------------------------
 # Global settings
 # -----------------------------------
-DEFAULT_DATA_PATH = "../Datasets/Extracted_Data/ycrit_weekly_w_mon_copy.csv"
+DEFAULT_DATA_PATH = "./dataset/ycrit_weekly_w_mon_copy.csv"
 AVAILABLE_HORIZONS = [1, 4, 12, 26, 52]
 
 # Friendly display labels shown to user in sidebar and all outputs
