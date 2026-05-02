@@ -1,6 +1,7 @@
 # app.py
 import streamlit as st
 import pandas as pd
+import os
 
 from data_utils import load_and_validate_data
 from forecasting import evaluate_on_holdout, fit_and_forecast, make_future_index
@@ -346,7 +347,6 @@ st.markdown("""
 # -----------------------------------
 # Global settings
 # -----------------------------------
-import os
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_DATA_PATH = os.path.join(BASE_DIR, "dataset", "ycrit_weekly_w_mon_copy.csv")
 
@@ -367,6 +367,12 @@ MODEL_INTERNAL_NAME = {
     "Model 2: SARIMA":          "SARIMA",
     "Model 3: Prophet":         "Prophet"
 }
+
+# Human-readable column label used in displayed tables
+YCRIT_DISPLAY_NAME = "Number of Vulnerabilities (Ycrit)"
+
+# Suffix appended to each model column in the Forecast Table
+VULN_COUNT_SUFFIX = " — Vulnerability Count"
 
 # ============================================================
 # SIDEBAR — always rendered
@@ -429,7 +435,6 @@ if mode in ("Mode A: Evaluation Mode", "Mode B: Forecast Mode"):
     run_action = st.sidebar.button("▶  Run Forecast")
 
 else:
-    # About mode — sidebar shows a gentle nudge only
     st.sidebar.markdown("""
         <p style="font-size:0.82rem; color:#a5b4fc; font-style:italic; text-align:center; padding:0.5rem 0;">
             Select Mode A or Mode B<br/>to activate forecast controls.
@@ -601,9 +606,14 @@ elif mode in ("Mode A: Evaluation Mode", "Mode B: Forecast Mode"):
             st.success("✅ Dataset loaded and validated successfully.")
             st.markdown("---")
 
+            # ── Input Data Preview ───────────────────────────────
             st.subheader("📋 Input Data Preview")
-            st.dataframe(df_app.tail(10), width="stretch")
+            preview_df = df_app.tail(10).copy()
+            preview_df.index.name = "Week"
+            preview_df = preview_df.rename(columns={"ycrit": YCRIT_DISPLAY_NAME})
+            st.dataframe(preview_df, width="stretch")
 
+            # ── Dataset Summary ──────────────────────────────────
             st.subheader("📊 Dataset Summary")
             col1, col2, col3 = st.columns(3)
             col1.metric("Observations", len(df_app))
@@ -612,6 +622,7 @@ elif mode in ("Mode A: Evaluation Mode", "Mode B: Forecast Mode"):
 
             st.markdown("---")
 
+            # ── Historical plot ──────────────────────────────────
             st.subheader("📈 Historical Weekly Series")
             fig_hist = plot_historical_series(df_app)
             st.plotly_chart(fig_hist, width="stretch")
@@ -671,7 +682,9 @@ elif mode in ("Mode A: Evaluation Mode", "Mode B: Forecast Mode"):
 
                 progress_text.success("✅ All selected evaluations completed.")
 
+                # ── Model Comparison Table
                 metrics_df = pd.DataFrame(metric_rows).sort_values(["Horizon_Weeks", "MAE"])
+                metrics_df = metrics_df.rename(columns={"Horizon_Weeks": "Horizon (Weeks)"})
 
                 st.markdown("---")
                 st.subheader("📊 Model Comparison Table")
@@ -696,6 +709,8 @@ elif mode in ("Mode A: Evaluation Mode", "Mode B: Forecast Mode"):
                     )
 
                     future_index = make_future_index(df_app.index.max(), horizon)
+
+                    # Raw forecast_df — used for CSV download (unrounded, original labels)
                     forecast_df = pd.DataFrame(index=future_index)
 
                     for model_label in selected_models:
@@ -711,6 +726,7 @@ elif mode in ("Mode A: Evaluation Mode", "Mode B: Forecast Mode"):
                             horizon
                         )
 
+                        # Store raw values under original label for CSV
                         forecast_df[model_label] = pred_values
 
                         fig_forecast = plot_future_forecast(
@@ -726,10 +742,37 @@ elif mode in ("Mode A: Evaluation Mode", "Mode B: Forecast Mode"):
 
                     progress_text.success("✅ All selected future forecasts completed.")
 
+                    # ── Forecast Table (display only) ────────────
+                    # - Index renamed to "Forecast Week"
+                    # - Columns renamed to "{model_label} — Vulnerability Count"
+                    # - Values rounded to whole numbers (integers)
                     st.markdown("---")
                     st.subheader(f"📋 Forecast Table — {horizon}-Week Horizon")
-                    st.dataframe(forecast_df, width="stretch")
 
+                    display_forecast_df = forecast_df.copy()
+
+                    # Round all model value columns to integers for display
+                    for col in display_forecast_df.columns:
+                        display_forecast_df[col] = display_forecast_df[col].round(0).astype(int)
+
+                    # Rename columns to include "— Vulnerability Count" suffix
+                    display_forecast_df = display_forecast_df.rename(
+                        columns={
+                            label: f"{label}{VULN_COUNT_SUFFIX}"
+                            for label in forecast_df.columns
+                        }
+                    )
+
+                    # Label and expose the index as "Forecast Week"
+                    display_forecast_df.index.name = "Forecast Week"
+                    display_forecast_df = display_forecast_df.reset_index()
+                    display_forecast_df["Forecast Week"] = display_forecast_df[
+                        "Forecast Week"
+                    ].dt.strftime("%Y-%m-%d")
+
+                    st.dataframe(display_forecast_df, width="stretch")
+
+                    # CSV download uses raw unrounded forecast_df with original labels
                     csv_bytes = forecast_df.to_csv().encode("utf-8")
                     st.download_button(
                         label=f"⬇️  Download Forecast CSV ({horizon} weeks)",
